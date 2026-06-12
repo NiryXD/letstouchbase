@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.orig.*
+
+# native build output
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+android/
+ios/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# next.js
+.next/
+out/
+
+# misc
+*.log
+.DS_Store
+*.tsbuildinfo
