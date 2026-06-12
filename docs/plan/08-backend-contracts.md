@@ -1,7 +1,7 @@
 # 08 · Backend Contracts: Who Writes What
 
 Every mutation in LTB is either a **client-direct write under RLS** (anon key
-+ Clerk JWT) or one of **seven Edge Functions** (service role). Nothing else
++ Clerk JWT) or one of **eight Edge Functions** (service role). Nothing else
 touches the database. This doc is the contract; if a phase needs a write path
 that isn't here, stop and add it here first.
 
@@ -15,6 +15,7 @@ matches.stage_x (own side)      │     block-user         block + end match
 blocks*/reports/devices         │     delete-account     full wipe + Clerk delete
 reference approval/delete       │     submit-reference   external, token-gated
                                 │     revenuecat-webhook entitlements upsert
+                                │     join-waitlist      pre-launch, public
         reads everything else ──┘
         (* simple blocks insert is client-direct; block-user wraps it
            when an active match must also be terminated)
@@ -32,7 +33,7 @@ reference approval/delete       │     submit-reference   external, token-gated
 > Push notifications for screens/matches move to Database Webhooks on the
 > `screens`/`matches` tables in Phase 3, unifying with chat dispatch.
 
-## The seven Edge Functions
+## The eight Edge Functions
 
 ### 1. `get-deck`
 - **Trigger:** Candidates tab load / pagination (TanStack Query).
@@ -103,6 +104,24 @@ reference approval/delete       │     submit-reference   external, token-gated
   entitlement; `headhunt_credits`/`boost_credits` incremented on consumable
   purchases (weekly Executive Suite headhunt grant also lands here as a
   RevenueCat recurring entitlement or via `ltb_nightly`).
+
+### 8. `join-waitlist`  *(pre-launch — the cold-start hook)*
+- **Trigger:** the waitlist form on `apps/web` (unauthenticated, like
+  `submit-reference`; deploy with `--no-verify-jwt`).
+- **Input:** `{ email, ref? }` — `ref` is the referrer's referral code from
+  the `?ref=` query param on the landing page.
+- **Does:** normalize + validate email, insert into `waitlist` generating a
+  short `referral_code`; **idempotent on email** — re-submitting returns the
+  existing code rather than erroring. A valid `ref` sets `referred_by` and
+  increments the referrer's `referral_count` (once per signup; self-referral
+  rejected). Returns `{ referralCode, position }` where position orders by
+  `(referral_count desc, created_at asc)` — the Employee Referral Bonus:
+  refer colleagues, move up.
+- **RLS:** `waitlist` has RLS enabled with **no policies** — service role
+  only; the anon key can't read or write it.
+- **Abuse posture (v1):** email format + length caps server-side; no
+  per-IP rate limiting until it's a real problem (free tier, no extra
+  infra). Invite waves are drawn manually from this table at launch.
 
 ## Push notification dispatch
 
