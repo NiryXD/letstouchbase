@@ -20,6 +20,18 @@ reference approval/delete       │     submit-reference   external, token-gated
            when an active match must also be terminated)
 ```
 
+> **Implementation note (migration 3):** `get-deck`, `request-screen`,
+> `decide-screen`, and `block-user` are implemented as SECURITY DEFINER
+> Postgres RPCs (`ltb_get_deck`, `ltb_request_screen`, `ltb_decide_screen`,
+> `ltb_block_user`) rather than Edge Functions. Identical server-side
+> enforcement — viewer identity always derives from `ltb_uid()`, never from
+> arguments — but testable without a Deno deploy and atomic by transaction.
+> The contracts below still define their semantics. Edge Functions remain the
+> plan for everything that calls external APIs: push dispatch (Phase 3),
+> `delete-account` (Clerk API), `submit-reference`, `revenuecat-webhook`.
+> Push notifications for screens/matches move to Database Webhooks on the
+> `screens`/`matches` tables in Phase 3, unifying with chat dispatch.
+
 ## The seven Edge Functions
 
 ### 1. `get-deck`
