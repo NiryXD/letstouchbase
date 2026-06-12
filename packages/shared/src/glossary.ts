@@ -10,6 +10,23 @@ export const glossary = {
     tagline: "Built for your two weeks' notice.",
   },
 
+  auth: {
+    signInTitle: "Badge In",
+    signInSub: "Welcome back to the office.",
+    signUpTitle: "New Hire Orientation",
+    signUpSub: "Let's get you in the system.",
+    emailLabel: "Email",
+    passwordLabel: "Password",
+    signInCta: "Badge In",
+    signUpCta: "Submit Application",
+    verifyTitle: "Identity Verification",
+    verifySub: "HR sent a 6-digit code to your inbox.",
+    verifyCta: "Confirm Identity",
+    toSignUp: "New around here? Begin orientation",
+    toSignIn: "Already employed here? Badge in",
+    signOut: "Resign (Sign Out)",
+  },
+
   profile: {
     title: "Your Resume",
     bio: "Executive Summary",

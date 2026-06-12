@@ -1,60 +1,29 @@
-import { glossary } from '@ltb/shared';
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 
-import { LTB } from '@/constants/theme';
+import { setClerkTokenGetter } from '@/lib/supabase';
 
 const queryClient = new QueryClient();
 
-function TabIcon({ glyph }: { glyph: string }) {
-  return <Text style={{ fontSize: 18 }}>{glyph}</Text>;
+/** Bridges the Clerk session into the Supabase client (runbook section 2.3). */
+function SupabaseTokenBridge() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setClerkTokenGetter(() => getToken());
+  }, [getToken]);
+  return null;
 }
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Tabs
-        screenOptions={{
-          headerStyle: { backgroundColor: LTB.paper },
-          headerTitleStyle: { color: LTB.navy, fontWeight: '700' },
-          headerShadowVisible: true,
-          tabBarActiveTintColor: LTB.primary,
-          tabBarInactiveTintColor: LTB.inkSecondary,
-          tabBarStyle: { backgroundColor: LTB.paper },
-          sceneStyle: { backgroundColor: LTB.feedGray },
-        }}>
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: glossary.tabs.candidates,
-            tabBarIcon: () => <TabIcon glyph="🗂️" />,
-          }}
-        />
-        <Tabs.Screen
-          name="inbound"
-          options={{
-            title: glossary.tabs.inbound,
-            headerTitle: glossary.inbound.title,
-            tabBarIcon: () => <TabIcon glyph="📥" />,
-          }}
-        />
-        <Tabs.Screen
-          name="pipeline"
-          options={{
-            title: glossary.tabs.pipeline,
-            headerTitle: glossary.pipeline.title,
-            tabBarIcon: () => <TabIcon glyph="📊" />,
-          }}
-        />
-        <Tabs.Screen
-          name="you"
-          options={{
-            title: glossary.tabs.you,
-            tabBarIcon: () => <TabIcon glyph="📄" />,
-          }}
-        />
-      </Tabs>
-    </QueryClientProvider>
+    <ClerkProvider tokenCache={tokenCache}>
+      <QueryClientProvider client={queryClient}>
+        <SupabaseTokenBridge />
+        <Stack screenOptions={{ headerShown: false }} />
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
