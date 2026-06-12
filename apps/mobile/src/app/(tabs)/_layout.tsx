@@ -4,6 +4,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { Text } from 'react-native';
 
 import { LTB } from '@/constants/theme';
+import { useMyProfile } from '@/lib/profile';
 
 function TabIcon({ glyph }: { glyph: string }) {
   return <Text style={{ fontSize: 18 }}>{glyph}</Text>;
@@ -11,9 +12,10 @@ function TabIcon({ glyph }: { glyph: string }) {
 
 export default function TabsLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return null;
+  const { data: profile, isLoading } = useMyProfile();
+  if (!isLoaded || (isSignedIn && isLoading)) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
-  // TODO(onboarding): signed in but no profiles row → redirect to (onboarding)
+  if (!profile) return <Redirect href="/(onboarding)" />;
 
   return (
     <Tabs
