@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { track } from './observability'; // [Opus 4.8] Phase 6 analytics
 import { supabase } from './supabase';
 
 export type CardPhoto = { id: number; slot: string; path: string };
@@ -27,6 +28,8 @@ export type CardReference = {
   relationship: string | null;
   body: string;
 };
+// [Opus 4.8] CardEndorsement + endorsements field — authored this session
+export type CardEndorsement = { skill: string; count: number };
 
 export type ResumeCard = {
   userId: string;
@@ -45,6 +48,7 @@ export type ResumeCard = {
   experience: CardExperience[];
   education: CardEducation[];
   references: CardReference[];
+  endorsements: CardEndorsement[];
 };
 
 export type Deck = { widened: boolean; pick: ResumeCard | null; candidates: ResumeCard[] };
@@ -87,6 +91,9 @@ export function useRequestScreen() {
       });
       if (error) throw error;
     },
+    // [Opus 4.8] Phase 6 analytics
+    onSuccess: (_d, input) =>
+      track('screen_requested', { headhunt: input.headhunt ?? false, kind: input.annotated.kind }),
   });
 }
 
@@ -99,6 +106,23 @@ export function useRejectCandidate() {
         .insert({ from_user: userId!, to_user: target });
       if (error && error.code !== '23505') throw error; // duplicate pass is fine
     },
+    onSuccess: () => track('candidate_rejected'), // [Opus 4.8] Phase 6 analytics
+  });
+}
+
+// [Opus 4.8] Counteroffer — undo a Reject Candidate (free, per the plan).
+export function useUndoReject() {
+  const { userId } = useAuth();
+  return useMutation({
+    mutationFn: async (target: string) => {
+      const { error } = await supabase
+        .from('rejects')
+        .delete()
+        .eq('from_user', userId!)
+        .eq('to_user', target);
+      if (error) throw error;
+    },
+    onSuccess: () => track('counteroffer'),
   });
 }
 
@@ -159,9 +183,11 @@ export function useDecideScreen() {
       if (error) throw error;
       return data as { ok: boolean; matchId?: string };
     },
-    onSuccess: () => {
+    onSuccess: (data, input) => {
       queryClient.invalidateQueries({ queryKey: ['inbound'] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
+      // [Opus 4.8] Phase 6 analytics — a match is the key conversion event
+      track('screen_decided', { decision: input.decision, matched: !!data.matchId });
     },
   });
 }

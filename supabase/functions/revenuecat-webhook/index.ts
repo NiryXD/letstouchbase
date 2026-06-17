@@ -6,6 +6,8 @@
 // Authorization header to "Bearer <RC_WEBHOOK_SECRET>". App user ID must be
 // the Clerk user id (Purchases.configure with appUserID = clerk user id).
 import { createClient } from "npm:@supabase/supabase-js@2";
+// [Opus 4.8] pure product decoding lives in _shared so it can be unit-tested
+import { creditsFor } from "../_shared/rc-products.ts";
 
 const db = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -22,22 +24,6 @@ const ACTIVATING = new Set([
   "UNCANCELLATION",
   "PRODUCT_CHANGE",
 ]);
-
-/**
- * Consumable product ids encode kind and quantity:
- * ltb_headhunt_1, ltb_headhunt_5, ltb_boost_1 (Expedited Review), …
- * Unknown products grant nothing (logged) so a typo'd product can't
- * mint credits.
- */
-function creditsFor(productId: string): { headhunt: number; boost: number } {
-  const m = productId.match(/_(\d+)$/);
-  const qty = m ? parseInt(m[1], 10) : 1;
-  if (productId.includes("headhunt")) return { headhunt: qty, boost: 0 };
-  if (productId.includes("boost") || productId.includes("expedited")) {
-    return { headhunt: 0, boost: qty };
-  }
-  return { headhunt: 0, boost: 0 };
-}
 
 Deno.serve(async (req) => {
   const headers = { "Content-Type": "application/json" };

@@ -4,6 +4,8 @@ import {
   DEGREE_LEVELS,
   DEGREE_RANK,
   DEPARTMENT_ARCHETYPES,
+  ENDORSABLE_SKILLS,
+  EXIT_OUTCOMES,
   FAMILY_PLANS,
   GENDERS,
   HAS_KIDS,
@@ -34,6 +36,9 @@ test("taxonomy arrays contain no duplicates", () => {
   assertUnique("LIFESTYLE_FREQUENCY", LIFESTYLE_FREQUENCY);
   assertUnique("POLITICS", POLITICS);
   assertUnique("PIPELINE_STAGES", PIPELINE_STAGES);
+  // [Opus 4.8] assertions below authored this session
+  assertUnique("ENDORSABLE_SKILLS", ENDORSABLE_SKILLS);
+  assertUnique("EXIT_OUTCOMES", EXIT_OUTCOMES);
 });
 
 test("DEGREE_RANK covers every degree level with a non-negative tier", () => {

@@ -276,6 +276,7 @@ export default function Home() {
           <nav aria-label="Legal">
             <Link href="/privacy/">Privacy Policy</Link>
             <Link href="/terms/">Terms of Service</Link>
+            <Link href="/support/">Support</Link>{/* [Opus 4.8] */}
           </nav>
         </div>
       </footer>

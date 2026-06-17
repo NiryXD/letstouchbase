@@ -6,7 +6,9 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": ["node"]
   },
+  "//": "[Opus 4.8] added node types so *.test.ts typecheck (was a silent CI failure)",
   "include": ["src"]
 }

@@ -16,6 +16,8 @@ export type ProfileRow = {
   birthdate: string;
   gender: string;
   out_of_office: boolean;
+  is_business_trip: boolean; // [Opus 4.8] Business Trip
+  resume_pdf_path: string | null; // [Opus 4.8] Resume on File
 };
 
 /** The gate query: null = signed in but not onboarded yet. */
@@ -28,7 +30,7 @@ export function useMyProfile() {
       const { data, error } = await supabase
         .from('profiles')
         .select(
-          'user_id, first_name, headline, executive_summary, current_title, employer, industry, archetype, open_to_work, birthdate, gender, out_of_office',
+          'user_id, first_name, headline, executive_summary, current_title, employer, industry, archetype, open_to_work, birthdate, gender, out_of_office, is_business_trip, resume_pdf_path',
         )
         .eq('user_id', userId!)
         .maybeSingle();

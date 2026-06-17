@@ -181,6 +181,25 @@ export function ResumeCard({
     );
   }
 
+  // [Opus 4.8] Endorsements section — authored by Claude Opus 4.8 this session
+  if (card.endorsements.length) {
+    blocks.push(
+      <View key="endorsements" style={styles.block}>
+        <Text style={styles.section}>{glossary.endorsements.title}</Text>
+        <View style={styles.endorseWrap}>
+          {card.endorsements.map((e) => (
+            <View key={e.skill} style={styles.endorseChip}>
+              <Text style={styles.endorseSkill}>{e.skill}</Text>
+              <View style={styles.endorseCount}>
+                <Text style={styles.endorseCountText}>{e.count}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>,
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       {blocks}
@@ -215,6 +234,29 @@ const styles = StyleSheet.create({
   entryMeta: { color: LTB.inkSecondary, fontSize: 13, marginTop: 2 },
   entryLine: { color: LTB.ink, fontSize: 13, marginTop: 4 },
   refBody: { color: LTB.ink, fontStyle: 'italic', lineHeight: 20 },
+  // [Opus 4.8] endorsement chip styles — authored this session
+  endorseWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  endorseChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: LTB.feedGray,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 6,
+  },
+  endorseSkill: { color: LTB.navy, fontSize: 13, fontWeight: '600' },
+  endorseCount: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: LTB.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  endorseCountText: { color: LTB.paper, fontSize: 12, fontWeight: '700' },
   annotateHint: {
     color: LTB.primary,
     fontSize: 11,

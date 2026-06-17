@@ -125,6 +125,33 @@ export const BEHAVIORAL_QUESTIONS = [
   "What does work-life balance mean to you, romantically?",
 ] as const;
 
+// [Opus 4.8] ENDORSABLE_SKILLS + EXIT_OUTCOMES — authored this session
+/**
+ * Endorsable "core competencies" — the satirical skill set colleagues can
+ * vouch for. Fixed list so endorsement counts aggregate cleanly (no free text
+ * to fragment the tallies) and the joke stays curated. Stored as the string
+ * values below in `endorsements.skill`.
+ */
+export const ENDORSABLE_SKILLS = [
+  "Synergy",
+  "Stakeholder Management",
+  "Responds to Texts Within One Business Day",
+  "Conflict Resolution",
+  "Emotional Availability (Q4)",
+  "Active Listening",
+  "Work-Life Balance",
+  "Punctuality",
+  "Cross-Functional Flirting",
+  "Manages Up",
+  "Low Maintenance, High Output",
+  "Strategic Vision",
+] as const;
+export type EndorsableSkill = (typeof ENDORSABLE_SKILLS)[number];
+
+/** Exit Interview — "We Met" feedback loop. Did the alignment call convert? */
+export const EXIT_OUTCOMES = ["great", "fine", "poor", "no_show"] as const;
+export type ExitOutcome = (typeof EXIT_OUTCOMES)[number];
+
 export const PIPELINE_STAGES = [
   "sourced",
   "initial_screen",

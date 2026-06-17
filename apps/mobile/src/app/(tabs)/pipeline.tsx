@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { LTB } from '@/constants/theme';
+import { EmptyPipelineArt, EmptyState } from '@/components/illustrations'; // [Opus 4.8] design pass
 import { photoUrl } from '@/lib/discovery';
-import { useMatches, useSetStage, type MatchSummary } from '@/lib/matches';
+import { useActionRequired, useMatches, useSetStage, type MatchSummary } from '@/lib/matches';
 import { supabase } from '@/lib/supabase';
 
 const STAGE_LABELS: Record<string, string> = Object.fromEntries(
@@ -47,15 +48,17 @@ export default function PipelineScreen() {
   const { data: matches } = useMatches();
   const minis = useMiniProfiles((matches ?? []).map((m) => m.otherUserId));
   const setStage = useSetStage();
+  // [Opus 4.8] Action Required — matches awaiting your reply
+  const { data: actionable } = useActionRequired((matches ?? []).map((m) => m.matchId));
 
   if (!matches?.length) {
+    // [Opus 4.8] illustrated empty state
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>Pipeline empty.</Text>
-        <Text style={styles.sub}>
-          Extend some offers — candidates land here once an offer is accepted.
-        </Text>
-      </View>
+      <EmptyState
+        art={<EmptyPipelineArt />}
+        title="Pipeline empty"
+        body="Extend some offers — candidates land here once an offer is accepted."
+      />
     );
   }
 
@@ -91,9 +94,13 @@ export default function PipelineScreen() {
                   )}
                   <View style={styles.rowMeta}>
                     <Text style={styles.rowName}>{mini?.first_name ?? '…'}</Text>
-                    <Text style={styles.rowHeadline} numberOfLines={1}>
-                      {mini?.headline ?? ''}
-                    </Text>
+                    {actionable?.has(m.matchId) ? (
+                      <Text style={styles.actionRequired}>● {glossary.pipeline.actionRequired}</Text>
+                    ) : (
+                      <Text style={styles.rowHeadline} numberOfLines={1}>
+                        {mini?.headline ?? ''}
+                      </Text>
+                    )}
                   </View>
                   <Pressable
                     style={styles.advance}
@@ -135,6 +142,7 @@ const styles = StyleSheet.create({
   rowMeta: { flex: 1 },
   rowName: { color: LTB.ink, fontWeight: '600' },
   rowHeadline: { color: LTB.inkSecondary, fontSize: 12 },
+  actionRequired: { color: LTB.gold, fontSize: 12, fontWeight: '700' }, // [Opus 4.8]
   advance: { padding: 8 },
   advanceText: { color: LTB.primary, fontSize: 18, fontWeight: '700' },
 });

@@ -1,14 +1,17 @@
 import { glossary } from '@ltb/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router'; // [Opus 4.8] Phase 5 paywall navigation
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LTB } from '@/constants/theme';
+import { EmptyState, SourcingArt } from '@/components/illustrations'; // [Opus 4.8] design pass
 import { CoverLetterModal } from '@/features/discovery/CoverLetterModal';
 import { ResumeCard } from '@/features/discovery/ResumeCard';
 import {
   useDeck,
   useRejectCandidate,
+  useUndoReject,
   type AnnotatedItem,
   type ResumeCard as Card,
 } from '@/lib/discovery';
@@ -16,10 +19,13 @@ import {
 export default function CandidatesScreen() {
   const { data: deck, isLoading, isError, refetch } = useDeck();
   const reject = useRejectCandidate();
+  const undoReject = useUndoReject(); // [Opus 4.8] Counteroffer
   const queryClient = useQueryClient();
   const [cursor, setCursor] = useState(0);
   const [annotated, setAnnotated] = useState<AnnotatedItem | null>(null);
   const [limitHit, setLimitHit] = useState(false);
+  // [Opus 4.8] last reject, for the Counteroffer (undo) banner
+  const [lastReject, setLastReject] = useState<{ userId: string; name: string } | null>(null);
 
   if (isLoading) {
     return (
@@ -52,7 +58,16 @@ export default function CandidatesScreen() {
   const onReject = () => {
     if (!current) return;
     reject.mutate(current.card.userId);
+    setLastReject({ userId: current.card.userId, name: current.card.firstName });
     advance();
+  };
+
+  // [Opus 4.8] Counteroffer — undo the last reject, step back to that card
+  const onCounteroffer = () => {
+    if (!lastReject) return;
+    undoReject.mutate(lastReject.userId);
+    setLastReject(null);
+    setCursor((c) => Math.max(0, c - 1));
   };
 
   const refreshDeck = async () => {
@@ -61,25 +76,29 @@ export default function CandidatesScreen() {
   };
 
   if (limitHit) {
+    // [Opus 4.8] daily limit now routes to the real paywall (Phase 5)
     return (
       <View style={styles.center}>
         <Text style={styles.limitTitle}>Screening capacity reached</Text>
         <Text style={styles.dim}>{glossary.discovery.dailyLimitReached}</Text>
-        <Text style={styles.dimSmall}>
-          ({glossary.premium.tierName} arrives in Phase 5 — for now, come back tomorrow.)
-        </Text>
+        <Pressable style={styles.upgrade} onPress={() => router.push('/paywall')}>
+          <Text style={styles.upgradeText}>{glossary.premium.paywallTitle}</Text>
+        </Pressable>
+        <Text style={styles.dimSmall}>Or come back tomorrow — your 8 free screens reset daily.</Text>
       </View>
     );
   }
 
   if (!current) {
+    // [Opus 4.8] illustrated empty state
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyTitle}>{glossary.discovery.emptyDeck}</Text>
-        <Pressable style={styles.refresh} onPress={refreshDeck}>
-          <Text style={styles.refreshText}>Check for new applicants</Text>
-        </Pressable>
-      </View>
+      <EmptyState
+        art={<SourcingArt />}
+        title={glossary.discovery.emptyDeck}
+        body="No candidates match your Hiring Criteria right now. Widen your radius or check back soon."
+        ctaLabel="Check for new applicants"
+        onPressCta={refreshDeck}
+      />
     );
   }
 
@@ -110,6 +129,7 @@ export default function CandidatesScreen() {
           onClose={() => setAnnotated(null)}
           onSent={() => {
             setAnnotated(null);
+            setLastReject(null);
             advance();
           }}
           onDailyLimit={() => {
@@ -117,6 +137,17 @@ export default function CandidatesScreen() {
             setLimitHit(true);
           }}
         />
+      ) : null}
+      {/* [Opus 4.8] Counteroffer (undo reject) banner */}
+      {lastReject ? (
+        <View style={styles.counterBar}>
+          <Text style={styles.counterText} numberOfLines={1}>
+            {glossary.counteroffer.rejected(lastReject.name)}
+          </Text>
+          <Pressable onPress={onCounteroffer} hitSlop={8}>
+            <Text style={styles.counterUndo}>{glossary.counteroffer.undo}</Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -129,6 +160,13 @@ const styles = StyleSheet.create({
   dimSmall: { color: LTB.inkSecondary, textAlign: 'center', fontSize: 12 },
   emptyTitle: { color: LTB.ink, fontWeight: '600', fontSize: 16, textAlign: 'center' },
   limitTitle: { color: LTB.navy, fontWeight: '700', fontSize: 18 },
+  upgrade: {
+    backgroundColor: LTB.primary,
+    borderRadius: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  }, // [Opus 4.8]
+  upgradeText: { color: LTB.paper, fontWeight: '700' }, // [Opus 4.8]
   refresh: {
     borderWidth: 1,
     borderColor: LTB.primary,
@@ -156,4 +194,20 @@ const styles = StyleSheet.create({
     backgroundColor: LTB.paper,
   },
   rejectText: { color: LTB.reject, fontWeight: '700' },
+  // [Opus 4.8] Counteroffer banner
+  counterBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: LTB.navy,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  counterText: { color: LTB.paper, flex: 1, marginRight: 12 },
+  counterUndo: { color: LTB.gold, fontWeight: '800' },
 });

@@ -1,6 +1,8 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { glossary } from '@ltb/shared';
+import { useQuery } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import {
   Alert,
@@ -16,14 +18,20 @@ import {
 
 import { LTB } from '@/constants/theme';
 import { useProfileCard } from '@/lib/discovery';
+// [Opus 4.8] Endorse + Exit Interview wiring authored this session
+import { EndorseModal } from '@/features/match/EndorseModal';
+import { ExitInterviewModal } from '@/features/match/ExitInterviewModal';
 import {
   useBlockUser,
   useMessages,
   useReport,
   useRetractMessage,
   useSendMessage,
+  useSubmitExitInterview,
   useTerminate,
 } from '@/lib/matches';
+import { getResumeSignedUrl } from '@/lib/resume'; // [Opus 4.8] Resume on File (match-gated)
+import { supabase } from '@/lib/supabase';
 
 export default function AlignmentCallScreen() {
   const { id, other } = useLocalSearchParams<{ id: string; other: string }>();
@@ -35,7 +43,33 @@ export default function AlignmentCallScreen() {
   const terminate = useTerminate();
   const block = useBlockUser();
   const report = useReport();
+  // [Opus 4.8] Exit Interview + Endorse state authored this session
+  const submitExit = useSubmitExitInterview();
   const [draft, setDraft] = useState('');
+  const [endorsing, setEndorsing] = useState(false);
+  // when set, the Termination succeeded and we collect the Exit Interview
+  const [exitForMatch, setExitForMatch] = useState<string | null>(null);
+
+  // [Opus 4.8] Resume on File — the other party's path (file itself is RLS-gated)
+  const { data: resumePath } = useQuery({
+    queryKey: ['resume-path', other],
+    enabled: !!other,
+    queryFn: async (): Promise<string | null> => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('resume_pdf_path')
+        .eq('user_id', other)
+        .maybeSingle();
+      return data?.resume_pdf_path ?? null;
+    },
+  });
+
+  const onViewResume = async () => {
+    if (!resumePath) return;
+    const url = await getResumeSignedUrl(resumePath);
+    if (url) await WebBrowser.openBrowserAsync(url);
+    else Alert.alert(glossary.profile.resumeOnFile, glossary.profile.resumeUnavailable);
+  };
 
   const onSend = () => {
     const body = draft.trim();
@@ -62,11 +96,29 @@ export default function AlignmentCallScreen() {
           style: 'destructive',
           onPress: async () => {
             await terminate.mutateAsync(id);
-            router.back();
+            // surface the Exit Interview instead of leaving immediately
+            setExitForMatch(id);
           },
         },
       ],
     );
+  };
+
+  // [Opus 4.8] Exit Interview submit/skip handlers authored this session
+  const onSubmitExit = async (input: {
+    met: boolean;
+    outcome: 'great' | 'fine' | 'poor' | 'no_show';
+    note: string;
+  }) => {
+    if (!exitForMatch) return;
+    await submitExit.mutateAsync({ matchId: exitForMatch, ...input });
+    setExitForMatch(null);
+    router.back();
+  };
+
+  const onSkipExit = () => {
+    setExitForMatch(null);
+    router.back();
   };
 
   const onReportBlock = () => {
@@ -104,6 +156,10 @@ export default function AlignmentCallScreen() {
         }}
       />
       <View style={styles.actionsRow}>
+        {/* [Opus 4.8] Endorse action authored this session */}
+        <Pressable onPress={() => setEndorsing(true)}>
+          <Text style={styles.actionPrimary}>{glossary.endorsements.cta}</Text>
+        </Pressable>
         <Pressable onPress={onTerminate}>
           <Text style={styles.actionDanger}>{glossary.actions.unmatch}</Text>
         </Pressable>
@@ -111,6 +167,12 @@ export default function AlignmentCallScreen() {
           <Text style={styles.actionDanger}>Report & Block</Text>
         </Pressable>
       </View>
+      {/* [Opus 4.8] Resume on File — only matched users can open the signed URL */}
+      {resumePath ? (
+        <Pressable style={styles.resumeBar} onPress={onViewResume}>
+          <Text style={styles.resumeBarText}>📄 {glossary.profile.resumeViewMatch}</Text>
+        </Pressable>
+      ) : null}
       <FlatList
         style={styles.list}
         contentContainerStyle={styles.listContent}
@@ -152,6 +214,23 @@ export default function AlignmentCallScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* [Opus 4.8] Endorse + Exit Interview modals authored this session */}
+      {endorsing && otherCard ? (
+        <EndorseModal
+          name={otherCard.firstName}
+          targetUserId={other}
+          onClose={() => setEndorsing(false)}
+        />
+      ) : null}
+      {exitForMatch ? (
+        <ExitInterviewModal
+          name={otherCard?.firstName ?? 'this candidate'}
+          submitting={submitExit.isPending}
+          onSubmit={onSubmitExit}
+          onSkip={onSkipExit}
+        />
+      ) : null}
     </View>
   );
 }
@@ -169,6 +248,17 @@ const styles = StyleSheet.create({
     borderBottomColor: LTB.divider,
   },
   actionDanger: { color: LTB.reject, fontSize: 12, fontWeight: '600' },
+  actionPrimary: { color: LTB.primary, fontSize: 12, fontWeight: '700' }, // [Opus 4.8]
+  // [Opus 4.8] Resume on File bar
+  resumeBar: {
+    backgroundColor: LTB.paper,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LTB.divider,
+    alignItems: 'center',
+  },
+  resumeBarText: { color: LTB.primary, fontWeight: '700', fontSize: 13 },
   list: { flex: 1 },
   listContent: { padding: 16, gap: 8 },
   bubble: { maxWidth: '80%', borderRadius: 10, padding: 12 },

@@ -14,6 +14,8 @@
 //   supabase functions deploy push-dispatch --no-verify-jwt
 //   supabase secrets set LTB_WEBHOOK_SECRET=<random>
 import { createClient } from "npm:@supabase/supabase-js@2";
+// [Opus 4.8] pure prefs logic lives in _shared so it can be unit-tested
+import { shouldNotify, type NotifyPrefs } from "../_shared/notify.ts";
 
 const db = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -28,6 +30,32 @@ type WebhookPayload = {
 };
 
 type Push = { to: string; title: string; body: string; data?: Record<string, unknown> };
+
+// [Opus 4.8] Phase 6 — recipient with the category used to honor prefs.
+type Recipient = {
+  userId: string;
+  title: string;
+  body: string;
+  data: { kind: string } & Record<string, unknown>;
+};
+
+/**
+ * Drop recipients who muted this category, disabled push entirely, or are in
+ * their quiet-hours window. A missing prefs row = defaults (everything on).
+ * The decision logic is pure + unit-tested in ../_shared/notify.test.ts.
+ */
+async function filterByPrefs(recipients: Recipient[]): Promise<Recipient[]> {
+  const ids = [...new Set(recipients.map((r) => r.userId))];
+  if (ids.length === 0) return recipients;
+  const { data: rows, error } = await db
+    .from("notification_prefs")
+    .select("user_id, push_enabled, screens, matches, messages, rejections, quiet_start, quiet_end, tz")
+    .in("user_id", ids);
+  if (error) throw new Error(`notification_prefs: ${error.message}`);
+  const byUser = new Map((rows ?? []).map((r) => [r.user_id, r as NotifyPrefs & { user_id: string }]));
+  const now = new Date();
+  return recipients.filter((r) => shouldNotify(byUser.get(r.userId), r.data.kind, now));
+}
 
 /** Resolve a set of user ids to one message per registered device. */
 async function buildPushes(
@@ -107,7 +135,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const out: { userId: string; title: string; body: string; data?: Record<string, unknown> }[] = [];
+    const out: Recipient[] = [];
 
     switch (payload.table) {
       case "messages": {
@@ -160,8 +188,10 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ ok: true, skipped: payload.table }), { status: 200, headers });
     }
 
-    await send(await buildPushes(out));
-    return new Response(JSON.stringify({ ok: true, sent: out.length }), { status: 200, headers });
+    // [Opus 4.8] honor per-category opt-outs + quiet hours before sending
+    const allowed = await filterByPrefs(out);
+    await send(await buildPushes(allowed));
+    return new Response(JSON.stringify({ ok: true, sent: allowed.length }), { status: 200, headers });
   } catch (err) {
     console.error("push-dispatch failed", payload.table, err);
     // 200 anyway: webhook retries can't fix a logic error and pushes are

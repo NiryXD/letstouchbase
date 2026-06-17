@@ -11,5 +11,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/`, changeFrequency: "weekly", priority: 1 },
     { url: `${BASE}/privacy/`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${BASE}/terms/`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${BASE}/support/`, changeFrequency: "monthly", priority: 0.3 }, // [Opus 4.8]
   ];
 }

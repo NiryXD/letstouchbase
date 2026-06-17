@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { track } from './observability'; // [Opus 4.8] Phase 6 analytics
 import { supabase } from './supabase';
 
 export type MatchRow = {
@@ -50,6 +51,35 @@ export function useMatches() {
   });
 }
 
+/**
+ * [Opus 4.8] Action Required — the anti-ghosting "Your Turn" signal. A match is
+ * actionable when the most recent (non-retracted) message came from the other
+ * party: they're awaiting your reply. Returns the set of such match ids.
+ */
+export function useActionRequired(matchIds: string[]) {
+  const { userId } = useAuth();
+  return useQuery({
+    queryKey: ['action-required', userId, ...matchIds],
+    enabled: !!userId && matchIds.length > 0,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('match_id, sender, retracted, created_at')
+        .in('match_id', matchIds)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const seen = new Set<string>();
+      const actionable = new Set<string>();
+      for (const m of data ?? []) {
+        if (seen.has(m.match_id)) continue; // first row per match = latest
+        seen.add(m.match_id);
+        if (!m.retracted && m.sender !== userId) actionable.add(m.match_id);
+      }
+      return actionable;
+    },
+  });
+}
+
 export function useSetStage() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
@@ -78,6 +108,33 @@ export function useTerminate() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['matches', userId] }),
+  });
+}
+
+// [Opus 4.8] useSubmitExitInterview — authored by Claude Opus 4.8 this session
+/**
+ * Exit Interview — the "We Met" feedback loop, filed after a Termination.
+ * Confidential and owner-scoped via RLS; one per (match, user). A duplicate
+ * (23505) means it was already filed — treated as success.
+ */
+export function useSubmitExitInterview() {
+  const { userId } = useAuth();
+  return useMutation({
+    mutationFn: async (input: {
+      matchId: string;
+      met: boolean;
+      outcome: 'great' | 'fine' | 'poor' | 'no_show';
+      note?: string;
+    }) => {
+      const { error } = await supabase.from('exit_interviews').insert({
+        match_id: input.matchId,
+        user_id: userId!,
+        met: input.met,
+        outcome: input.outcome,
+        note: input.note?.trim() ? input.note.trim() : null,
+      });
+      if (error && error.code !== '23505') throw error;
+    },
   });
 }
 
@@ -166,7 +223,10 @@ export function useSendMessage(matchId: string | undefined) {
         .insert({ match_id: matchId!, sender: userId!, body });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['messages', matchId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', matchId] });
+      track('message_sent'); // [Opus 4.8] Phase 6 analytics
+    },
   });
 }
 
