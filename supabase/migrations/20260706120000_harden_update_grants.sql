@@ -31,6 +31,21 @@
 -- Timestamp-named per supabase-gotchas so it sorts after the applied set.
 
 -- ---------------------------------------------------------------------------
+-- 0. Baseline API-role grants — made explicit.
+--    Supabase's hosted projects grant the `authenticated` role table
+--    privileges on `public` (RLS is the real gate). We restate that here so
+--    this migration is self-contained and behaves identically in production
+--    and in the `supabase db start` pgTAP harness (which does not materialize
+--    those default privileges). Every table in `public` has RLS enabled, so
+--    these grants expose nothing on their own — and, crucially, they give the
+--    column-scoped REVOKE/GRANT below a table-level grant to carve down from,
+--    plus the SELECT that UPDATE ... WHERE needs to evaluate its predicate.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 1. profiles — grant writes only on user-editable columns.
 --    Server-owned (never client-writable): desirability, completeness,
 --    last_active_at (nightly / get-deck), boosted_until (paid Expedited
