@@ -243,6 +243,12 @@ export const glossary = {
   notifications: {
     title: "Notification Settings",
     sub: "Manage what HR is allowed to ping you about. Nothing erodes trust faster than a spammy dating app.",
+    // contextual pre-prompt shown before the OS permission dialog (store-readiness)
+    primerTitle: "Can HR reach you?",
+    primerBody:
+      "We'll notify you when a candidate applies, an offer is extended, or an Alignment Call gets a reply. No spam, no digests — you control every category, and can set Quiet Hours, in Settings.",
+    primerEnable: "Keep me posted",
+    primerDismiss: "Not right now",
     master: "Push Notifications",
     masterSub: "The master switch. Off means total radio silence.",
     categoriesTitle: "Per-category",

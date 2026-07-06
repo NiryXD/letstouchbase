@@ -5,6 +5,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -47,6 +48,7 @@ export default function AlignmentCallScreen() {
   const submitExit = useSubmitExitInterview();
   const [draft, setDraft] = useState('');
   const [endorsing, setEndorsing] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   // when set, the Termination succeeded and we collect the Exit Interview
   const [exitForMatch, setExitForMatch] = useState<string | null>(null);
 
@@ -65,10 +67,15 @@ export default function AlignmentCallScreen() {
   });
 
   const onViewResume = async () => {
-    if (!resumePath) return;
-    const url = await getResumeSignedUrl(resumePath);
-    if (url) await WebBrowser.openBrowserAsync(url);
-    else Alert.alert(glossary.profile.resumeOnFile, glossary.profile.resumeUnavailable);
+    if (!resumePath || resumeLoading) return;
+    setResumeLoading(true);
+    try {
+      const url = await getResumeSignedUrl(resumePath);
+      if (url) await WebBrowser.openBrowserAsync(url);
+      else Alert.alert(glossary.profile.resumeOnFile, glossary.profile.resumeUnavailable);
+    } finally {
+      setResumeLoading(false);
+    }
   };
 
   const onSend = () => {
@@ -169,8 +176,12 @@ export default function AlignmentCallScreen() {
       </View>
       {/* [Opus 4.8] Resume on File — only matched users can open the signed URL */}
       {resumePath ? (
-        <Pressable style={styles.resumeBar} onPress={onViewResume}>
-          <Text style={styles.resumeBarText}>📄 {glossary.profile.resumeViewMatch}</Text>
+        <Pressable style={styles.resumeBar} onPress={onViewResume} disabled={resumeLoading}>
+          {resumeLoading ? (
+            <ActivityIndicator color={LTB.primary} />
+          ) : (
+            <Text style={styles.resumeBarText}>📄 {glossary.profile.resumeViewMatch}</Text>
+          )}
         </Pressable>
       ) : null}
       <FlatList

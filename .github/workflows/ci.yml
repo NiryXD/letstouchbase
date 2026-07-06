@@ -48,3 +48,20 @@ jobs:
           deno-version: v2.x
       - name: Test Edge Function logic
         run: deno test supabase/functions/_shared/
+
+  # pgTAP suite against the real schema: RLS isolation, deck ranking, and the
+  # security-hardening regressions (column grants + integrity triggers). The
+  # GitHub runner has Docker, so `supabase db start` spins up local Postgres,
+  # applies every migration, and `supabase test db` runs each *.test.sql in a
+  # rolled-back transaction. These protect the guarantees that break silently.
+  db-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Postgres + apply migrations
+        run: supabase db start
+      - name: Run pgTAP tests
+        run: supabase test db

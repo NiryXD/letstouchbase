@@ -51,12 +51,11 @@ function routeFromData(data: unknown): void {
 }
 
 /**
- * Request permission, fetch the Expo push token, and upsert it into `devices`.
- * Returns the token, or null when push isn't available.
+ * Fetch the Expo push token and upsert it into `devices`. Assumes permission
+ * is already granted; returns the token, or null when push isn't available
+ * (no device, no EAS project, or the network write failed).
  */
-export async function registerForPushNotifications(userId: string): Promise<string | null> {
-  if (!Device.isDevice) return null; // no push on simulators/emulators
-
+async function storePushToken(userId: string): Promise<string | null> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
@@ -64,13 +63,6 @@ export async function registerForPushNotifications(userId: string): Promise<stri
       lightColor: '#0A66C2',
     });
   }
-
-  const existing = await Notifications.getPermissionsAsync();
-  let status = existing.status;
-  if (status !== 'granted') {
-    status = (await Notifications.requestPermissionsAsync()).status;
-  }
-  if (status !== 'granted') return null;
 
   const id = projectId();
   if (!id) return null; // no EAS project yet — can't mint a token
@@ -93,15 +85,46 @@ export async function registerForPushNotifications(userId: string): Promise<stri
 }
 
 /**
- * Mounted once in the root layout: registers the device when signed in and
- * wires tap handling (both warm taps and cold-start launches).
+ * Register the device *only if permission is already granted* — never triggers
+ * the OS permission dialog. Called on every app open so a returning user who
+ * opted in keeps a fresh token, without a cold, contextless prompt. The
+ * contextual ask lives in `<NotificationPrimer>` (store-readiness: a clear
+ * pre-prompt rationale before the system dialog).
+ */
+export async function registerIfGranted(userId: string): Promise<string | null> {
+  if (!Device.isDevice) return null; // no push on simulators/emulators
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return null;
+  return storePushToken(userId);
+}
+
+/**
+ * Trigger the OS permission dialog, then register on grant. Call this from a
+ * user gesture *after* showing the rationale (the primer's "Keep me posted").
+ * Returns the token, or null if the user declined or push is unavailable.
+ */
+export async function requestAndRegister(userId: string): Promise<string | null> {
+  if (!Device.isDevice) return null;
+  const existing = await Notifications.getPermissionsAsync();
+  const status =
+    existing.status === 'granted'
+      ? existing.status
+      : (await Notifications.requestPermissionsAsync()).status;
+  if (status !== 'granted') return null;
+  return storePushToken(userId);
+}
+
+/**
+ * Mounted once in the root layout: registers the device when signed in (only
+ * if permission was already granted) and wires tap handling (both warm taps
+ * and cold-start launches).
  */
 export function usePushNotifications() {
   const { userId, isSignedIn } = useAuth();
 
   useEffect(() => {
     if (isSignedIn && userId) {
-      registerForPushNotifications(userId).catch(() => {});
+      registerIfGranted(userId).catch(() => {});
     }
   }, [isSignedIn, userId]);
 
