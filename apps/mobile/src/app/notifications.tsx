@@ -1,4 +1,5 @@
 // ─── [Opus 4.8] Authored by Claude Opus 4.8 in this session (Phase 6) ───────
+import { useAuth } from '@clerk/clerk-expo';
 import { glossary } from '@ltb/shared';
 import { Stack } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -9,6 +10,7 @@ import {
   useUpdateNotificationPrefs,
   type NotificationPrefs,
 } from '@/lib/notification-prefs';
+import { requestAndRegister } from '@/lib/notifications';
 
 const N = glossary.notifications;
 
@@ -60,6 +62,7 @@ function HourStepper({ label, hour, onChange }: { label: string; hour: number; o
 }
 
 export default function NotificationsScreen() {
+  const { userId } = useAuth();
   const { data: prefs } = useNotificationPrefs();
   const update = useUpdateNotificationPrefs();
 
@@ -84,6 +87,12 @@ export default function NotificationsScreen() {
   }
 
   const set = (patch: Partial<NotificationPrefs>) => update.mutate(patch);
+  // Enabling the master switch also secures OS permission + registers this
+  // device, so a user who dismissed the primer still has an in-app opt-in path.
+  const onToggleMaster = (v: boolean) => {
+    set({ pushEnabled: v });
+    if (v && userId) requestAndRegister(userId).catch(() => {});
+  };
   const quietOn = prefs.quietStart !== null && prefs.quietEnd !== null;
   const muted = !prefs.pushEnabled;
 
@@ -97,7 +106,7 @@ export default function NotificationsScreen() {
           label={N.master}
           sub={N.masterSub}
           value={prefs.pushEnabled}
-          onChange={(v) => set({ pushEnabled: v })}
+          onChange={onToggleMaster}
         />
       </View>
 

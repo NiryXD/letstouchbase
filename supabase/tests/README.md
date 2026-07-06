@@ -11,6 +11,13 @@ These verify the things that are easy to break silently:
 - **`deck.test.sql`** — `ltb_deck_candidates` still surfaces mutually-eligible
   candidates after the Phase 5 re-declare, and an active Expedited Review
   (boost) pins a resume to the top of the deck.
+- **`hardening.test.sql`** — the 2026-07-06 security audit regressions: a client
+  cannot self-grant a boost or inflate `desirability` (profiles column grants),
+  cannot rewrite a match counterparty to fabricate a match / reach a stranger's
+  private résumé (matches column grants), cannot move the counterparty's
+  pipeline stage (trigger), and cannot silently edit a sent message body
+  (messages column grant). Legitimate self-edits, own-stage moves, and retract
+  still pass.
 
 ## Run
 
@@ -19,18 +26,9 @@ supabase test db
 ```
 
 This applies every migration to a throwaway local database and runs each file
-in a rolled-back transaction (requires Docker + the Supabase CLI). Add to CI
-once Docker-in-CI is worthwhile:
-
-```yaml
-  db-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
-      - run: supabase db start
-      - run: supabase test db
-```
+in a rolled-back transaction (requires Docker + the Supabase CLI). **This now
+runs in CI** on every push via the `db-tests` job in
+`.github/workflows/ci.yml` (`supabase db start` → `supabase test db`).
 
 The Edge Functions' pure logic is covered separately by Deno unit tests
 (`supabase/functions/_shared/*.test.ts`), which run in CI on every push.

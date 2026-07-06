@@ -59,14 +59,20 @@ platform — no need to set them.
 
 ## 1. Database — apply the pending migrations
 
-Three migrations are written but **not yet applied** (Phases 4–6). They are
-timestamp-named so they sort *after* the already-applied `20260612*` ones:
+Four migrations are written but **not yet applied** (Phases 4–6 + the security
+hardening pass). They are timestamp-named so they sort *after* the
+already-applied `20260612*` ones:
 
 - `20260614120000_phase4_the_bit.sql` — exit_interviews, endorsements insert
   policy, endorsement tallies in `ltb_profile_card`, `ltb_performance_review()`
 - `20260614130000_phase5_boost.sql` — `boosted_until` column,
   `ltb_activate_boost()`, boost term in `ltb_deck_candidates`
 - `20260615120000_phase6_notifications.sql` — `notification_prefs` table
+- `20260706120000_harden_update_grants.sql` — **security-critical.** Column-level
+  write grants + integrity triggers on `profiles`, `matches`, `messages`,
+  `reference_letters`. Closes two privilege-escalation gaps found in the
+  2026-07-06 audit (free self-boost; match fabrication → private-résumé theft).
+  Verified by `supabase/tests/hardening.test.sql`, now run in CI.
 
 ```bash
 supabase link --project-ref fzvsaxwmbllrbpzxmded   # if not already linked
@@ -85,6 +91,11 @@ select proname from pg_proc
   where proname in ('ltb_performance_review','ltb_activate_boost'); -- both rows
 select column_name from information_schema.columns
   where table_name='profiles' and column_name='boosted_until';   -- one row
+-- hardening applied: authenticated must NOT hold UPDATE on server-owned columns
+select 1 from information_schema.column_privileges
+  where grantee='authenticated' and table_name='profiles'
+    and column_name in ('boosted_until','desirability');         -- zero rows
+select tgname from pg_trigger where tgname in ('matches_guard','messages_guard'); -- two rows
 ```
 
 ---
